@@ -23,7 +23,7 @@ const API = {
                     { role: 'system', content: systemPrompt },
                     { role: 'user', content: userPrompt }
                 ],
-                temperature: 0.8,
+                temperature: 1,
                 max_tokens: 500
             })
         });
