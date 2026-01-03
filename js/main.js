@@ -325,6 +325,7 @@
         const culprit = Characters.get(Game.currentCase.culprit);
         const topSuspect = Characters.get(result.topSuspect);
         const victim = Characters.get(Game.currentCase.victim);
+        const currentPhase = Game.state.cluePhase;
 
         // 投票统计
         let statsHtml = '📊 投票结果：<br>';
@@ -342,32 +343,55 @@
             UI.addSystemMessage(`真正的凶手是 ${culprit.name}。`);
         }
 
-        // 展示案件全貌
-        let caseDetail = `<br>📋 <b>案件全貌</b><br>`;
-        caseDetail += `受害者：${victim.name}<br>`;
-        caseDetail += `真凶：${culprit.name}<br>`;
-        caseDetail += `地点：${Game.currentCase.location}<br>`;
-        caseDetail += `时间：${Game.currentCase.time}<br><br>`;
+        // 根据当前阶段展示不同内容
+        if (currentPhase >= 3) {
+            // 第三阶段：展示完整案件全貌
+            let caseDetail = `<br>📋 <b>案件全貌</b><br>`;
+            caseDetail += `受害者：${victim.name}<br>`;
+            caseDetail += `真凶：${culprit.name}<br>`;
+            caseDetail += `地点：${Game.currentCase.location}<br>`;
+            caseDetail += `时间：${Game.currentCase.time}<br><br>`;
 
-        caseDetail += `<b>各角色持有的线索（第三阶段完整版）：</b><br>`;
-        for (const [charId, clue] of Object.entries(Game.currentCase.cluesPhase3)) {
-            const char = Characters.get(charId);
-            if (char) {
-                caseDetail += `【${char.name}】${clue}<br>`;
+            caseDetail += `<b>各角色持有的线索（完整版）：</b><br>`;
+            for (const [charId, clue] of Object.entries(Game.currentCase.cluesPhase3)) {
+                const char = Characters.get(charId);
+                if (char) {
+                    caseDetail += `【${char.name}】${clue}<br>`;
+                }
             }
-        }
-        UI.addSystemMessage(caseDetail);
+            UI.addSystemMessage(caseDetail);
 
-        // 揭示隐藏任务
-        let tasksHtml = '<br><b>🎭 各角色的隐藏任务：</b><br>';
-        for (const [charId, task] of Object.entries(Game.currentCase.hiddenTasks)) {
-            const char = Characters.get(charId);
-            if (char) {
-                const isCulprit = charId === Game.currentCase.culprit ? '【真凶】' : '';
-                tasksHtml += `${isCulprit}${char.name}: ${task}<br>`;
+            // 揭示隐藏任务
+            let tasksHtml = '<br><b>🎭 各角色的隐藏任务：</b><br>';
+            for (const [charId, task] of Object.entries(Game.currentCase.hiddenTasks)) {
+                const char = Characters.get(charId);
+                if (char) {
+                    const isCulprit = charId === Game.currentCase.culprit ? '【真凶】' : '';
+                    tasksHtml += `${isCulprit}${char.name}: ${task}<br>`;
+                }
             }
+            UI.addSystemMessage(tasksHtml);
+        } else {
+            // 第一或第二阶段：只展示当前阶段的线索
+            const phaseNames = ['', '第一阶段', '第二阶段', '第三阶段'];
+            const currentClues = Game.getCurrentClues();
+            
+            let partialInfo = `<br>📋 <b>当前掌握的线索（${phaseNames[currentPhase]}）</b><br>`;
+            partialInfo += `受害者：${victim.name}<br>`;
+            partialInfo += `地点：${Game.currentCase.location}<br>`;
+            partialInfo += `时间：${Game.currentCase.time}<br><br>`;
+            
+            partialInfo += `<b>各角色已透露的线索：</b><br>`;
+            for (const [charId, clue] of Object.entries(currentClues)) {
+                const char = Characters.get(charId);
+                if (char) {
+                    partialInfo += `【${char.name}】${clue}<br>`;
+                }
+            }
+            UI.addSystemMessage(partialInfo);
+            
+            UI.addSystemMessage(`<br>💡 <b>提示：</b>你还没有发现全部真相！讨论只进行到${phaseNames[currentPhase]}，还有更多线索等待挖掘。下次试试深入调查吧！`);
         }
-        UI.addSystemMessage(tasksHtml);
 
         UI.showStartButton(true);
         UI.showNextButton(false);
