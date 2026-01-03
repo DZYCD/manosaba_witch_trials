@@ -38,23 +38,14 @@ ${fullTruth}
 
 【当前线索阶段】第${currentPhase}阶段
 
-【阶段转换条件 - 必须严格遵守！】
+【阶段转换条件】
 
-第1阶段→第2阶段的条件：
-必须是橘雪莉（sherii）亲口说出"汉娜去了钟楼找蕾雅"这个信息！
-   - 如果是其他人说的，不算！
-   - 如果雪莉还没发言说出这个信息，不能转阶段！
-   - 必须在对话记录中找到【橘雪莉】说的包含"汉娜"和"钟楼"的内容
+第1阶段→第2阶段：
+只要对话中有人提到"汉娜去了钟楼"就立即转阶段！
+- 不管是谁说的都算
 
-第2阶段→第3阶段的条件（必须全部满足）：
-1. 【关键】必须是不的场亚里沙（arisa）亲口说出"只有药水能杀死魔女"或类似内容！
-   - 如果是其他人说的，不算！
-2. 有人追问可可关于药水的事
-
-【判断原则】
-- 严格检查对话记录，确认是指定角色说出了关键信息
-- 不要因为讨论方向对了就提前转阶段
-- 必须看到具体的发言内容才能判断
+第2阶段→第3阶段：
+只要亚里沙（arisa）说出"只有药水能杀死魔女"或类似内容，就转阶段！
 
 【输出格式】
 只输出以下之一：
@@ -78,11 +69,28 @@ ${fullTruth}
             ? `\n【重要】上一位发言者是 ${lastSpeaker}，你必须选择其他人发言，不能连续让同一人发言！` 
             : '';
 
+        // 检查最后发言的是否是艾玛
+        const lastMessage = this.state.history.length > 0 
+            ? this.state.history[this.state.history.length - 1] 
+            : null;
+        const isEmmaLastSpeaker = lastMessage && lastMessage.speaker === 'emma';
+        
+        // 如果艾玛刚发言，强调要响应她的要求
+        let emmaDirectionHint = '';
+        if (isEmmaLastSpeaker) {
+            emmaDirectionHint = `\n【最高优先级】艾玛刚刚发言了："${lastMessage.content}"
+你必须分析艾玛的发言，判断她想让谁回答：
+- 如果艾玛提到了某个角色的名字或ID，让那个角色发言
+- 如果艾玛问了某个问题，让最可能知道答案的角色回答
+- 如果艾玛质疑某人，让那个人辩护
+- 艾玛的意愿是最重要的，必须尊重！`;
+        }
+
         // 检查玩家最近是否发言，提取玩家关注点
         const playerMessages = this.state.history.filter(h => h.speaker === 'emma');
         const lastPlayerMessage = playerMessages.length > 0 ? playerMessages[playerMessages.length - 1].content : null;
-        const playerFocusHint = lastPlayerMessage 
-            ? `\n【玩家关注点】樱羽艾玛最近说："${lastPlayerMessage}"\n你应该顺着玩家的思路，选择能够回应玩家疑问的角色发言。` 
+        const playerFocusHint = (!isEmmaLastSpeaker && lastPlayerMessage)
+            ? `\n【玩家关注点】樱羽艾玛之前说过："${lastPlayerMessage}"\n可以参考玩家的思路。` 
             : '';
 
         // 第一轮不能选希罗
@@ -100,19 +108,20 @@ ${fullTruth}
 
 【参与者】
 ${charList}
+${emmaDirectionHint}
 
 【发言规则】
 - 绝对不能让同一个角色连续发言两轮！
+- 如果玩家（艾玛）刚发言，必须优先响应她的要求
 - 如果玩家提问了某人，让那个人回答
 - 如果玩家质疑某人，让那个人辩护
 - 如果没有明确方向，可以随机选择
-- 偶尔可以点名玩家（emma）发言
 ${lastSpeakerHint}
 ${playerFocusHint}
 ${firstRoundHint}
 
 【进入投票的条件】
-- 已达到30轮讨论
+- 已达到25轮讨论
 - 玩家明确表示要投票
 
 【输出格式】
@@ -218,21 +227,21 @@ ${this.formatHistory() || '（讨论刚开始）'}
     // 解析剧情判官回复
     parseStoryJudgeResponse(text) {
         if (text.includes('【进入第二阶段】')) {
-            // 额外检查：确保雪莉说过汉娜去钟楼的事
-            const sheriiMessages = this.state.history.filter(h => h.speaker === 'sherii');
-            const sheriiSaidIt = sheriiMessages.some(m => 
+            // 检查：只要有人说过汉娜去钟楼的事就行
+            const allMessages = this.state.history;
+            const someoneSaidIt = allMessages.some(m => 
                 (m.content.includes('汉娜') && (m.content.includes('钟楼') || m.content.includes('上楼') || m.content.includes('找蕾雅')))
             );
-            if (!sheriiSaidIt) {
-                console.warn('阶段转换被阻止：雪莉还没说出汉娜去钟楼的事');
+            if (!someoneSaidIt) {
+                console.warn('阶段转换被阻止：还没有人说出汉娜去钟楼的事');
                 return null;
             }
             return 2;
         } else if (text.includes('【进入第三阶段】')) {
-            // 额外检查：确保亚里沙说过药水的事
+            // 检查：确保亚里沙说过药水的事
             const arisaMessages = this.state.history.filter(h => h.speaker === 'arisa');
             const arisaSaidIt = arisaMessages.some(m => 
-                m.content.includes('药水') || m.content.includes('药') && m.content.includes('杀')
+                m.content.includes('药水') || (m.content.includes('药') && m.content.includes('杀'))
             );
             if (!arisaSaidIt) {
                 console.warn('阶段转换被阻止：亚里沙还没说出药水的事');
