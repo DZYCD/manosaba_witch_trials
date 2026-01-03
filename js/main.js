@@ -337,18 +337,16 @@
 
         // 判断结果
         if (result.isCorrect) {
-            UI.addSystemMessage(`🎉 正义得到伸张！大家成功找出了真凶——${culprit.name}！`);
+            UI.addSystemMessage(`🎉 正义得到伸张！大家成功找出了真凶！`);
         } else {
             UI.addSystemMessage(`😢 真凶逃脱了...${topSuspect.name}被冤枉处刑了。`);
-            UI.addSystemMessage(`真正的凶手是 ${culprit.name}。`);
         }
 
         // 根据当前阶段展示不同内容
         if (currentPhase >= 3) {
-            // 第三阶段：展示完整案件全貌
+            // 第三阶段：展示完整案件全貌（但不揭示凶手）
             let caseDetail = `<br>📋 <b>案件全貌</b><br>`;
             caseDetail += `受害者：${victim.name}<br>`;
-            caseDetail += `真凶：${culprit.name}<br>`;
             caseDetail += `地点：${Game.currentCase.location}<br>`;
             caseDetail += `时间：${Game.currentCase.time}<br><br>`;
 
@@ -360,17 +358,6 @@
                 }
             }
             UI.addSystemMessage(caseDetail);
-
-            // 揭示隐藏任务
-            let tasksHtml = '<br><b>🎭 各角色的隐藏任务：</b><br>';
-            for (const [charId, task] of Object.entries(Game.currentCase.hiddenTasks)) {
-                const char = Characters.get(charId);
-                if (char) {
-                    const isCulprit = charId === Game.currentCase.culprit ? '【真凶】' : '';
-                    tasksHtml += `${isCulprit}${char.name}: ${task}<br>`;
-                }
-            }
-            UI.addSystemMessage(tasksHtml);
         } else {
             // 第一或第二阶段：只展示当前阶段的线索
             const phaseNames = ['', '第一阶段', '第二阶段', '第三阶段'];

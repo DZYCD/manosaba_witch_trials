@@ -1,28 +1,42 @@
-// 案件定义 - 魔法少女的魔女审判
-const Cases = {
-    list: [
-        {
-            id: 'case_001',
-            title: '钟楼坠落事件',
-            victim: 'reia',  // 莲见蕾雅
-            culprit: 'noah', // 城崎诺亚（真凶）
-            location: '监牢钟楼',
-            time: '昨晚8点半左右',
-            publicInfo: '莲见蕾雅被发现坠落于钟楼下。尸体由奈叶香最先发现并查验。现场没有明显打斗痕迹，但钟楼顶层的栏杆有损坏。',
-            // 误导性线索 - 只给AI看，不显示在UI上
-            misleadingInfo: '案发当天下午，希罗和蕾雅曾因为舞台剧中艾玛应该扮演什么角色而发生激烈争执，两人闹得很不愉快。汉娜当晚和蕾雅在钟楼上争吵过。',
-            
-            // 典狱长掌握的案件全貌（完整真相）
-            fullTruth: `【案件全貌 - 仅典狱长可见】
-真凶：城崎诺亚
-受害者：莲见蕾雅
-第一阶段嫌疑人：二阶堂希罗（有不在场证明）
-第二阶段嫌疑人：远野汉娜（实际无辜）
+// 游戏核心逻辑
+const Game = {
+    state: null,
+    currentCase: null,
+    isProcessing: false,
 
-【真相】
-蕾雅执意要修改舞台剧剧本，让安安当女主角。但这样一来，汉娜辛苦准备的演出服就要全部重做。汉娜约蕾雅到钟楼谈判，争吵中汉娜说了很过分的话："你这个人一辈子都得不到别人的尊重，反正在监狱里，你就是再闪耀也不可能被别人看见了。"这句话触发了蕾雅的禁忌，导致蕾雅魔女化。
+    // 初始化新游戏
+    init(caseData) {
+        this.currentCase = caseData;
+        this.state = {
+            round: 0,
+            maxRounds: 25,
+            phase: 'discussion', // discussion, voting, ended
+            cluePhase: 1,  // 线索阶段：1, 2, 3
+            history: [],
+            votes: {},
+            waitingForPlayer: false
+        };
+    },
 
-魔女化的蕾雅准备杀死汉娜。此时，在画室画画的诺亚通过窗户目睹了这一幕。为了保护汉娜，诺亚将白天可可不小心丢在画室的"杀死魔女的药水"用液体操控魔法化作子弹，通过画室的垃圾滑槽射向钟楼的垃圾滑槽，击中了蕾雅的头部。蕾雅头顶被开了一个血洞，失足从钟楼坠落，造成"摔死"的假象。
+    // 获取当前阶段的线索
+    getCurrentClues() {
+        const phase = this.state.cluePhase;
+        if (phase === 1) return this.currentCase.cluesPhase1;
+        if (phase === 2) return this.currentCase.cluesPhase2;
+        return this.currentCase.cluesPhase3;
+    },
+
+    // 获取剧情判官系统提示词（知道全部真相，负责判断阶段转换）
+    getStoryJudgePrompt() {
+        const fullTruth = this.currentCase.fullTruth || '';
+        const currentPhase = this.state.cluePhase;
+
+        return `你是"魔女裁决"的剧情判官，负责判断讨论是否应该进入下一阶段。
+
+【你掌握的案件全貌】
+${fullTruth}
+
+【当前线索阶段】第${currentPhase}阶段
 
 【完整推理流程】
 第一阶段：怀疑希罗
@@ -48,76 +62,567 @@ const Cases = {
 - 玛格说垃圾滑槽相连（满足杀人的隐蔽性）
 - 诺亚破防，说蕾雅魔女化了，她只是为了保护汉娜
 
-【进入下一阶段的条件】
-第一阶段→第二阶段：希罗不在场证明确认 + 雪莉说出汉娜去了钟楼
-第二阶段→第三阶段：亚里沙说出"只有药水能杀死魔女" + 众人追问可可药在哪`,
+【阶段转换条件】
 
-            // 第一阶段：怀疑希罗 → 希罗有不在场证明 → 逼问出汉娜去了钟楼
-            cluesPhase1: {
-                hiro: '你下午确实和蕾雅吵过架，那是关于舞台剧角色的事，你们吵得很凶。但案发时间8点到9点，你一直和艾玛在淋浴室里，艾玛可以为你作证！你是无辜的！',
-                koko: '8:30左右あてぃし正在和米莉亚讨论下一次直播的内容，突然听到钟楼那边传来很尖的尖叫声。对了，下午希罗和蕾雅吵得很凶呢~',
-                sherii: '下午希罗和蕾雅的争吵很激烈呢！你知道汉娜8点去了钟楼，但第一阶段你不想主动说，除非希罗被排除嫌疑后被问',
-                hanna: '......第一阶段你保持沉默。如果被问到不在场证明，你支支吾吾说不清楚',
-                anan: '......吾辈下午把改好的剧本给了蕾雅。下午希罗和蕾雅因为剧本的事吵架了...吾辈下午晕倒了，是玛格一直陪着吾辈在医务室。',
-                noah: '诺亚下午看到希罗和蕾雅吵架了~希罗看起来很生气的样子~',
-                miria: '大叔我8:30左右正在和可可讨论直播的事，听到钟楼那边有尖叫声。下午希罗和蕾雅吵得挺凶的...',
-                nanoka: '...我在地上看到了蕾雅的尸体。下午希罗和蕾雅吵架了。',
-                margo: '呵呵~案发时我一直在医务室陪着晕倒的安安呢。下午希罗和蕾雅吵架的事？那可是闹得挺大的~',
-                arisa: '...我当时在外面游荡。下午希罗和蕾雅吵架了，我看到了。',
-                meruru: '下午希罗和蕾雅吵架了...希罗看起来很生气的样子。'
-            },
-            
-            // 第二阶段：怀疑汉娜 → 但头顶血洞、治疗失败等线索对不上
-            cluesPhase2: {
-                hiro: '你下午确实和蕾雅吵过架，但案发时间8点到9点，你一直和艾玛在淋浴室里！你有不在场证明！现在应该调查汉娜！',
-                koko: '8:30左右あてぃし正在和米莉亚讨论下一次直播的内容，突然听到钟楼那边传来很尖的尖叫声。（药水的事...あてぃし不想说...如果被追问就装傻）',
-                sherii: '晚上8点左右，汉娜说要去找蕾雅说清楚演出服的事就上了楼！汉娜当时看起来很生气！',
-                hanna: '你确实去钟楼找蕾雅谈了，你们吵了起来，你说了一些很过分的话...然后蕾雅突然变得很可怕，脸上出现了裂痕，你吓得尖叫。但是你没有杀她！你什么都没做，她突然头上冒血就倒下了！你真的没有动手！',
-                anan: '......吾辈下午把改好的剧本给了蕾雅。蕾雅为了照顾吾辈的情绪，让吾辈做女主角，所以执意要改剧本...这样汉娜的演出服就要重做了...都是吾辈的错...',
-                noah: '诺亚当时在画室画画~什么也不知道哦~（继续装作什么都不知道）',
-                miria: '大叔我8:30左右正在和可可讨论直播的事，也听到钟楼那边有声音。但是大叔我听到的和可可不太一样...除了尖叫声，好像还有另一个很恐怖的咆哮声？那不像是人的声音...',
-                nanoka: '...我在地上看到了蕾雅的尸体。她的头顶有一个血洞，脸上有裂痕。还有血蝴蝶在飞。这些都很奇怪...',
-                margo: '呵呵~案发时我一直在医务室陪着晕倒的安安呢。汉娜确实有嫌疑呢~',
-                arisa: '...魔女化的人应该摔不死吧。只有「杀死魔女的药水」才能杀死魔女。那瓶药水...好像是在可可手里？可可，药水呢？',
-                meruru: '对不起...奈叶香找我去治疗蕾雅姐姐，但是我怎么也救不回来...蕾雅姐姐脸上的裂痕是魔女化的痕迹，如果只是摔死我应该能救回来的...头顶的血洞不是摔出来的，是被什么东西击穿的...'
-            },
-            
-            // 第三阶段：药水、滑槽 → 诺亚是凶手
-            cluesPhase3: {
-                hiro: '你下午确实和蕾雅吵过架，但案发时间8点到9点，你一直和艾玛在淋浴室里！你有不在场证明！药水在画室...诺亚当时在画室画画？',
-                koko: '好吧あてぃし承认...白天直播的时候，あてぃし不小心把「杀死魔女的药水」丢在画室了...あてぃし真的不是故意的！',
-                sherii: '晚上8点左右，汉娜说要去找蕾雅说清楚演出服的事就上了楼！但是汉娜应该没有药水啊...',
-                hanna: '你确实去钟楼找蕾雅谈了，你们吵了起来，你说了一些很过分的话...然后蕾雅突然变得很可怕，脸上出现了裂痕，你吓得尖叫。但是你没有杀她！你什么都没做，她突然头上冒血就倒下了！你真的没有动手！',
-                anan: '......吾辈下午看见可可直播的时候不小心把「杀死魔女的药水」丢在画室了。画室...诺亚当时在画室画画...吾辈下午晕倒了，是玛格一直陪着吾辈在医务室。',
-                noah: '诺亚当时在画室画画~什么也不知道哦~（你是真凶，但如果证据确凿被逼问，你会承认是为了保护汉娜）',
-                miria: '大叔我8:30左右正在和可可讨论直播的事，也听到钟楼那边有声音。除了尖叫声，还有咆哮声...那应该是魔女化的声音吧？',
-                nanoka: '...我在地上看到了蕾雅的尸体。她的头顶有一个血洞。还有血蝴蝶。血蝴蝶是魔女化的证据...',
-                margo: '呵呵~案发时我一直在医务室陪着晕倒的安安呢。对了，这个监狱的垃圾滑槽总共有三条，分别在钟楼、画室和淋浴室，是连通的哦~从画室可以通过滑槽把东西送到钟楼呢~',
-                arisa: '...药水在画室，滑槽连通画室和钟楼...诺亚当时在画室...这一切都说得通了。',
-                meruru: '对不起...蕾雅姐姐的头顶有一个血洞，那是被什么东西击穿的...如果是药水的话，确实能杀死魔女化的人...'
-            },
+第1阶段→第2阶段：
+只要对话中有人提到"汉娜去了钟楼"就立即转阶段！
+- 不管是谁说的都算
 
-            hiddenTasks: {
-                hiro: '第一阶段你是嫌疑人，但你有不在场证明（8点到9点和艾玛在淋浴室）。你要积极证明自己的清白，强调艾玛可以为你作证！',
-                koko: '你丢了「杀死魔女的药水」这件事让你很心虚。第一、二阶段你绝对不想说这件事。第三阶段如果被逼问或者安安说出来了，你才会承认。',
-                sherii: '第一阶段你知道汉娜8点去了钟楼找蕾雅，但你不想主动说。当希罗被排除嫌疑后，如果有人追问其他人的不在场证明，你会说出汉娜去了钟楼。这是进入第二阶段的关键！',
-                hanna: '第一阶段你保持沉默，不主动说自己去过钟楼。第二阶段你是嫌疑人，但你真的没有杀人！你要拼命证明自己的清白，说明蕾雅是突然倒下的，你什么都没做。',
-                anan: '吾辈觉得是自己害死了蕾雅，因为是吾辈让蕾雅改剧本的...第三阶段吾辈会说出看到可可把药水丢在画室的事。这是指向诺亚的关键证据！',
-                noah: '你是真凶。你杀蕾雅是为了保护汉娜免受魔女化的蕾雅伤害。你要一直装作什么都不知道。但如果证据确凿（药水、滑槽、画室位置都被揭露），你会承认，并说明你是为了保护汉娜。',
-                miria: '你听到的声音和可可不一样，除了尖叫声还有咆哮声。第二阶段这很重要，说明当时有魔女化发生。',
-                nanoka: '你看到了头顶血洞和血蝴蝶。第二阶段这些信息很重要，说明蕾雅不是普通的摔死，而且发生了魔女化。',
-                margo: '你知道垃圾滑槽的秘密（钟楼、画室、淋浴室三处相连）。第三阶段这是破案的关键，说明画室可以通过滑槽攻击钟楼！',
-                arisa: '第二阶段你要说出关键信息：魔女化的人只有「杀死魔女的药水」才能杀死，而且药水好像在可可手里。这会引导大家追问可可药在哪里，推动进入第三阶段！',
-                meruru: '你的治愈魔法对蕾雅无效，头顶血洞不是摔出来的。第二阶段这说明她不是普通死法，是被什么东西击穿的。'
-            }
-        }
-    ],
+第2阶段→第3阶段：
+只要亚里沙（arisa）说出"只有药水能杀死魔女"或类似内容，就转阶段！
 
-    getRandom() {
-        return JSON.parse(JSON.stringify(this.list[0]));
+【输出格式】
+只输出以下之一：
+【保持当前阶段】
+【进入第二阶段】
+【进入第三阶段】`;
     },
 
-    get(id) {
-        return this.list.find(c => c.id === id);
+    // 检测是否有两人争论僵局（某人连续发言超过2轮）
+    detectStalemate() {
+        const history = this.state.history;
+        if (history.length < 4) return null;
+        
+        // 检查最近6条消息中是否有人发言超过2次
+        const recentMessages = history.slice(-6);
+        const speakerCounts = {};
+        for (const msg of recentMessages) {
+            if (msg.speaker !== 'emma') { // 不算玩家
+                speakerCounts[msg.speaker] = (speakerCounts[msg.speaker] || 0) + 1;
+            }
+        }
+        
+        // 找出发言超过2次的角色
+        for (const [speaker, count] of Object.entries(speakerCounts)) {
+            if (count > 2) {
+                return speaker;
+            }
+        }
+        return null;
+    },
+
+    // 获取打破僵局应该让谁发言
+    getStalemateBreaker(stalemateSpeaker) {
+        // 定义僵局打破者映射
+        const breakerMap = {
+            'hanna': 'sherii',   // 汉娜争论太多 → 让雪莉出来
+            'coco': 'anan',      // 可可争论太多 → 让安安出来
+            'hiro': 'millia',    // 希罗争论太多 → 让米莉亚出来
+            'noah': 'arisa',     // 诺亚争论太多 → 让亚里沙出来
+            'sherii': 'hanna',   // 雪莉争论太多 → 让汉娜出来
+            'anan': 'nayeka',    // 安安争论太多 → 让奈叶香出来
+            'millia': 'coco',    // 米莉亚争论太多 → 让可可出来
+            'arisa': 'noah',     // 亚里沙争论太多 → 让诺亚出来
+            'nayeka': 'anan'     // 奈叶香争论太多 → 让安安出来
+        };
+        return breakerMap[stalemateSpeaker] || null;
+    },
+
+    // 获取主持人系统提示词（不知道真相，只负责选人发言）
+    getHostPrompt() {
+        const charList = Characters.getAll()
+            .filter(c => c.id !== this.currentCase.victim)
+            .map(c => `- ${c.id}（${c.name}）`)
+            .join('\n');
+
+        // 获取当前阶段每个角色知道的线索
+        const currentClues = this.getCurrentClues();
+        let cluesSummary = '\n【各角色掌握的信息】\n';
+        for (const [charId, clue] of Object.entries(currentClues)) {
+            const char = Characters.get(charId);
+            if (char) {
+                // 去掉括号内的隐藏指示，保留完整内容
+                const simplifiedClue = clue.replace(/（[^）]*）/g, '').replace(/\([^)]*\)/g, '').trim();
+                cluesSummary += `- ${char.name}：${simplifiedClue}\n`;
+            }
+        }
+
+        // 检测僵局
+        const stalemateSpeaker = this.detectStalemate();
+        let stalemateHint = '';
+        if (stalemateSpeaker) {
+            const breaker = this.getStalemateBreaker(stalemateSpeaker);
+            const stalemateChar = Characters.get(stalemateSpeaker);
+            const breakerChar = breaker ? Characters.get(breaker) : null;
+            if (breakerChar) {
+                stalemateHint = `\n【打破僵局】${stalemateChar?.name || stalemateSpeaker}发言太多了，讨论陷入僵局！
+你必须让 ${breakerChar.name}（${breaker}）发言来推进讨论！`;
+                console.log(`[主持人] 检测到僵局：${stalemateChar?.name} 发言过多，建议让 ${breakerChar.name} 发言`);
+            }
+        }
+
+        // 获取上一位发言者
+        const lastSpeaker = this.state.history.length > 0 
+            ? this.state.history[this.state.history.length - 1].speaker 
+            : null;
+        const lastSpeakerHint = lastSpeaker 
+            ? `\n【重要】上一位发言者是 ${lastSpeaker}，你必须选择其他人发言，不能连续让同一人发言！` 
+            : '';
+
+        // 检查最后发言的是否是艾玛
+        const lastMessage = this.state.history.length > 0 
+            ? this.state.history[this.state.history.length - 1] 
+            : null;
+        const isEmmaLastSpeaker = lastMessage && lastMessage.speaker === 'emma';
+        
+        // 如果艾玛刚发言，强调要响应她的要求
+        let emmaDirectionHint = '';
+        if (isEmmaLastSpeaker) {
+            emmaDirectionHint = `\n【最高优先级】艾玛刚刚发言了："${lastMessage.content}"
+你必须分析艾玛的发言，判断她想让谁回答：
+- 如果艾玛提到了某个角色的名字或ID，让那个角色发言
+- 如果艾玛问了某个问题，根据上面的【各角色掌握的信息】，让最可能知道答案的角色回答
+- 如果艾玛质疑某人，让那个人辩护
+- 艾玛的意愿是最重要的，必须尊重！`;
+        }
+
+        // 检查玩家最近是否发言，提取玩家关注点
+        const playerMessages = this.state.history.filter(h => h.speaker === 'emma');
+        const lastPlayerMessage = playerMessages.length > 0 ? playerMessages[playerMessages.length - 1].content : null;
+        const playerFocusHint = (!isEmmaLastSpeaker && lastPlayerMessage)
+            ? `\n【玩家关注点】樱羽艾玛之前说过："${lastPlayerMessage}"\n可以参考玩家的思路。` 
+            : '';
+
+        // 第一轮不能选希罗
+        const firstRoundHint = this.state.round === 0
+            ? '\n【特别注意】这是第一轮发言，不能选择hiro（二阶堂希罗）作为第一个发言者！'
+            : '';
+
+        return `你是"魔女裁决"的主持人，负责决定下一位发言者。
+
+【你的职责】
+1. 根据对话内容选择合适的下一位发言者
+2. 尊重玩家（樱羽艾玛）的推理方向
+3. 玩家问什么，就让知道相关信息的角色回答
+4. 你要引导游戏进度朝着结局方向过去
+
+【参与者】
+${charList}
+${cluesSummary}
+${stalemateHint}
+${emmaDirectionHint}
+
+【发言规则】
+- 绝对不能让同一个角色连续发言两轮！
+- 如果有【打破僵局】提示，必须优先让指定角色发言！
+- 如果玩家（艾玛）刚发言，必须优先响应她的要求
+- 如果玩家提问了某人，让那个人回答
+- 如果玩家质疑某人，让那个人辩护
+- 如果没有明确方向或者丝毫没有进度，典狱长要选择可以推进进度的人来发言。
+${lastSpeakerHint}
+${playerFocusHint}
+${firstRoundHint}
+
+【进入投票的条件】
+- 已达到25轮讨论
+- 玩家明确表示要投票
+
+
+
+
+【输出格式】
+简短总结（1句话），然后：
+【下一位】角色ID
+
+或者：
+【进入投票】
+
+示例：
+"奈叶香说了魔女化的事。艾玛看来没有反应，为了游戏进度，我应该让亚里莎说魔女只会被药水杀死这件事"
+【下一位】arisa`;
+    },
+
+    // 获取角色系统提示词
+    getCharacterSystemPrompt(charId) {
+        const char = Characters.get(charId);
+        const clues = this.getCurrentClues();
+        const clue = clues[charId] || '你没有特别的线索。';
+        const task = this.currentCase.hiddenTasks[charId] || '尽力找出真凶。';
+        const currentPhase = this.state.cluePhase;
+
+        return `你是${char.name}，一位魔法少女，正在参与魔女裁决的讨论。
+
+【你的性格】
+${char.personality}
+
+【你的说话风格】
+${char.speakStyle}
+
+【当前讨论阶段】第${currentPhase}阶段
+
+【你知道的线索】
+${clue}
+
+【你的内心】
+${task}
+
+【发言要求】
+1. 用口语化、符合你性格的方式说话
+2. 不要主动透露所有线索！只有被直接问到时才说
+3. 可以说一些无关紧要的话，或者表达自己的情绪
+4. 如果你是嫌疑人，要为自己辩护
+5. 如果你有秘密（比如可可丢了药水），要尽量隐瞒，除非被逼问
+6. 回复控制在30-80字，像真人聊天一样
+7. 可以质疑别人，把嫌疑引向其他人`;
+    },
+
+    // 获取投票系统提示词
+    getVoteSystemPrompt(charId) {
+        const char = Characters.get(charId);
+        const task = this.currentCase.hiddenTasks[charId] || '找出真凶。';
+        
+        // 列出可投票的角色
+        const votableChars = Characters.getAll()
+            .filter(c => c.id !== this.currentCase.victim && c.id !== charId)
+            .map(c => `${c.id}（${c.name}）`)
+            .join('、');
+
+        return `你是${char.name}，讨论已经结束，现在要进行魔女投票。
+
+【你的隐藏任务】
+${task}
+
+【可投票的角色】
+${votableChars}
+
+【投票要求】
+根据讨论内容和你的任务，投出你认为是凶手的一票。
+必须从上面的角色中选择一个投票！
+不能投给受害者，不能投给自己。
+
+【输出格式】严格按照以下格式输出：
+【投票】角色ID
+【理由】一句话理由
+
+例如：
+【投票】hanna
+【理由】她的不在场证明有漏洞`;
+    },
+
+    // 格式化对话历史
+    formatHistory() {
+        return this.state.history
+            .map(h => `【${Characters.get(h.speaker)?.name || h.speaker}】${h.content}`)
+            .join('\n');
+    },
+
+    // 剧情判官决策（判断是否切换阶段）
+    async storyJudgeDecide() {
+        const systemPrompt = this.getStoryJudgePrompt();
+        const prompt = `【当前轮次】${this.state.round}/${this.state.maxRounds}
+【当前线索阶段】第${this.state.cluePhase}阶段
+
+【对话记录】
+${this.formatHistory() || '（讨论刚开始）'}
+
+请判断是否应该进入下一阶段。`;
+
+        console.log('[剧情判官] 系统提示词:', systemPrompt);
+        console.log('[剧情判官] 用户提示词:', prompt);
+
+        const response = await API.chat(systemPrompt, prompt);
+        return this.parseStoryJudgeResponse(response);
+    },
+
+    // 解析剧情判官回复
+    parseStoryJudgeResponse(text) {
+        console.log('[剧情判官] 原始回复:', text);
+        
+        if (text.includes('【进入第二阶段】')) {
+            // 检查：只要有人说过汉娜去钟楼的事就行
+            const allMessages = this.state.history;
+            const someoneSaidIt = allMessages.some(m => 
+                (m.content.includes('汉娜') && (m.content.includes('钟楼') || m.content.includes('上楼') || m.content.includes('找蕾雅')))
+            );
+            if (!someoneSaidIt) {
+                console.log('[剧情判官] 阶段转换被阻止：还没有人说出汉娜去钟楼的事');
+                return null;
+            }
+            console.log('[剧情判官] ✓ 条件满足，进入第二阶段');
+            return 2;
+        } else if (text.includes('【进入第三阶段】')) {
+            // 检查：确保亚里沙说过药水的事
+            const arisaMessages = this.state.history.filter(h => h.speaker === 'arisa');
+            const arisaSaidIt = arisaMessages.some(m => 
+                m.content.includes('药水') || (m.content.includes('药') && m.content.includes('杀'))
+            );
+            if (!arisaSaidIt) {
+                console.log('[剧情判官] 阶段转换被阻止：亚里沙还没说出药水的事');
+                return null;
+            }
+            console.log('[剧情判官] ✓ 条件满足，进入第三阶段');
+            return 3;
+        }
+        
+        console.log('[剧情判官] 保持当前阶段');
+        return null;
+    },
+
+    // 主持人决策（选择下一位发言者）
+    async hostDecide() {
+        const systemPrompt = this.getHostPrompt();
+        const prompt = `【案件信息】
+受害者：${Characters.get(this.currentCase.victim).name}
+地点：${this.currentCase.location}
+时间：${this.currentCase.time}
+
+【当前轮次】${this.state.round}/${this.state.maxRounds}
+
+【对话记录】
+${this.formatHistory() || '（讨论刚开始）'}
+
+推理应该顺畅进行。整个流程是这样，请你根据流程，以艾玛优先和推动剧情发展为准则决定发言人
+
+【完整推理流程】
+第一阶段：怀疑希罗
+- 大家都提到下午希罗和蕾雅吵架
+- 希罗提供不在场证明（和艾玛在淋浴室）
+- 玛格询问其他人的不在场证明
+- 亚里莎说自己在外面
+- 雪莉爆出汉娜说当时要去找蕾雅
+→ 进入第二阶段
+
+第二阶段：怀疑汉娜
+- 奈叶香：有血蝴蝶，头顶有血洞，蕾雅脸上有裂痕
+- 梅露露：奈叶香找她治疗蕾雅但救不回来，脸上的痕迹是魔女化的痕迹
+- 亚里沙：魔女应该摔不死，只有"杀死魔女的药水"才能杀死魔女
+- 众人询问可可药在哪
+→ 进入第三阶段
+
+第三阶段：真相揭露
+- 可可不承认
+- 安安说可可的药丢在画室了
+- 开始怀疑在画室画画的诺亚
+- 希罗说画室正好能看到钟楼(满足目击和杀人方式）
+- 药水被丢在画室（满足杀人可能性）
+- 玛格说垃圾滑槽相连（满足杀人的隐蔽性）
+- 诺亚破防，说蕾雅魔女化了，她只是为了保护汉娜 
+
+请决定下一位发言者。`;
+
+        console.log('[主持人] 系统提示词:', systemPrompt);
+        console.log('[主持人] 用户提示词:', prompt);
+
+        const response = await API.chat(systemPrompt, prompt);
+        return this.parseHostResponse(response);
+    },
+
+    // 解析主持人回复
+    parseHostResponse(text) {
+        console.log('[主持人] 原始回复:', text);
+        
+        const result = {
+            summary: text.replace(/【[^】]+】.*/g, '').trim(),
+            nextSpeaker: null,
+            startVoting: false
+        };
+
+        if (text.includes('【进入投票】')) {
+            result.startVoting = true;
+        }
+
+        // 尝试匹配【下一位】格式
+        const match = text.match(/【下一位】(\w+)/);
+        if (match) {
+            result.nextSpeaker = match[1];
+        }
+        
+        // 如果没有匹配到，尝试从文本中提取角色名
+        if (!result.nextSpeaker) {
+            const allChars = Characters.getAll().filter(c => c.id !== this.currentCase?.victim);
+            
+            // 先尝试匹配角色ID
+            for (const char of allChars) {
+                if (text.toLowerCase().includes(char.id)) {
+                    result.nextSpeaker = char.id;
+                    console.log('[主持人] 从文本中提取到角色ID:', char.id);
+                    break;
+                }
+            }
+            
+            // 如果还没找到，尝试匹配角色名字
+            if (!result.nextSpeaker) {
+                for (const char of allChars) {
+                    if (text.includes(char.name)) {
+                        result.nextSpeaker = char.id;
+                        console.log('[主持人] 从文本中提取到角色名:', char.name, '-> ID:', char.id);
+                        break;
+                    }
+                }
+            }
+        }
+
+        console.log('[主持人] 解析结果:', result);
+        return result;
+    },
+
+    // 典狱长决策（组合两个判断）
+    async wardenDecide() {
+        // 先让剧情判官判断是否切换阶段
+        const phaseChange = await this.storyJudgeDecide();
+        
+        // 再让主持人选择下一位发言者
+        const hostDecision = await this.hostDecide();
+        
+        return {
+            summary: hostDecision.summary,
+            nextSpeaker: hostDecision.nextSpeaker,
+            startVoting: hostDecision.startVoting,
+            phaseChange: phaseChange
+        };
+    },
+
+    // 解析典狱长回复（保留兼容性）
+    parseWardenResponse(text) {
+        const result = {
+            summary: text.replace(/【[^】]+】.*/g, '').trim(),
+            nextSpeaker: null,
+            startVoting: false,
+            phaseChange: null
+        };
+
+        // 检查阶段转换
+        if (text.includes('【进入第二阶段】')) {
+            result.phaseChange = 2;
+        } else if (text.includes('【进入第三阶段】')) {
+            result.phaseChange = 3;
+        }
+
+        if (text.includes('【进入投票】')) {
+            result.startVoting = true;
+        }
+
+        const match = text.match(/【下一位】(\w+)/);
+        if (match) {
+            result.nextSpeaker = match[1];
+        }
+
+        return result;
+    },
+
+    // 更新线索阶段
+    advanceCluePhase(newPhase) {
+        if (newPhase > this.state.cluePhase && newPhase <= 3) {
+            this.state.cluePhase = newPhase;
+            // 进入下一阶段，轮次上限+15
+            this.state.maxRounds += 15;
+            console.log(`[阶段转换] 进入第${newPhase}阶段，轮次上限增加到 ${this.state.maxRounds}`);
+            return true;
+        }
+        return false;
+    },
+
+    // 角色发言
+    async characterSpeak(charId) {
+        const char = Characters.get(charId);
+        const systemPrompt = this.getCharacterSystemPrompt(charId);
+        
+        // 误导性线索 - 只给AI看
+        const misleadingInfo = this.currentCase.misleadingInfo 
+            ? `\n【背景信息】${this.currentCase.misleadingInfo}` 
+            : '';
+
+        const prompt = `【案件背景】
+受害者：${Characters.get(this.currentCase.victim).name}
+${this.currentCase.publicInfo}${misleadingInfo}
+
+【当前讨论阶段】第${this.state.cluePhase}阶段
+
+【对话记录】
+${this.formatHistory()}
+
+现在轮到你发言了。`;
+
+        console.log(`[角色:${char?.name || charId}] 系统提示词:`, systemPrompt);
+        console.log(`[角色:${char?.name || charId}] 用户提示词:`, prompt);
+
+        return await API.chat(systemPrompt, prompt);
+    },
+
+    // 角色投票
+    async characterVote(charId) {
+        const prompt = `【对话记录摘要】
+${this.formatHistory()}
+
+请投出你的一票。`;
+
+        const response = await API.chat(this.getVoteSystemPrompt(charId), prompt);
+        return this.parseVoteResponse(response);
+    },
+
+    // 解析投票回复
+    parseVoteResponse(text) {
+        const result = { target: null, reason: '' };
+        
+        // 尝试多种匹配方式
+        let targetMatch = text.match(/【投票】\s*(\w+)/);
+        if (!targetMatch) {
+            targetMatch = text.match(/投票[：:]\s*(\w+)/);
+        }
+        if (!targetMatch) {
+            // 尝试匹配角色名
+            const allChars = Characters.getAll();
+            for (const char of allChars) {
+                if (text.includes(char.name) && char.id !== this.currentCase?.victim) {
+                    result.target = char.id;
+                    break;
+                }
+            }
+        } else {
+            result.target = targetMatch[1];
+        }
+
+        // 验证target是否有效
+        if (result.target && !Characters.get(result.target)) {
+            // 尝试通过名字找ID
+            const allChars = Characters.getAll();
+            for (const char of allChars) {
+                if (char.name.includes(result.target) || result.target.includes(char.name)) {
+                    result.target = char.id;
+                    break;
+                }
+            }
+        }
+
+        const reasonMatch = text.match(/【理由】(.+)/);
+        if (reasonMatch) {
+            result.reason = reasonMatch[1].trim();
+        } else {
+            // 如果没有理由标签，取第一句话作为理由
+            const sentences = text.split(/[。！？\n]/);
+            result.reason = sentences[0]?.trim() || '直觉';
+        }
+
+        return result;
+    },
+
+    // 添加消息到历史
+    addMessage(speaker, content) {
+        this.state.history.push({ speaker, content, time: Date.now() });
+        this.state.round++;
+    },
+
+    // 统计投票结果
+    countVotes() {
+        const counts = {};
+        for (const [voter, data] of Object.entries(this.state.votes)) {
+            const target = data.target;
+            counts[target] = (counts[target] || 0) + 1;
+        }
+        return counts;
+    },
+
+    // 获取投票结果
+    getVoteResult() {
+        const counts = this.countVotes();
+        const maxVotes = Math.max(...Object.values(counts));
+        const suspects = Object.keys(counts).filter(k => counts[k] === maxVotes);
+        
+        return {
+            counts,
+            topSuspect: suspects[0],
+            isTie: suspects.length > 1,
+            isCorrect: suspects.includes(this.currentCase.culprit)
+        };
     }
 };
