@@ -113,6 +113,36 @@ body {
     margin: 0.3rem 0;
 }
 
+.disclaimer .github-link {
+    margin-top: 0.5rem;
+    padding-top: 0.5rem;
+    border-top: 1px solid rgba(233, 69, 96, 0.3);
+}
+
+.disclaimer a {
+    color: var(--accent);
+    text-decoration: none;
+}
+
+.disclaimer a:hover {
+    text-decoration: underline;
+}
+
+.disclaimer .star-btn {
+    display: inline-block;
+    padding: 0.2rem 0.6rem;
+    background: var(--accent);
+    color: white;
+    border-radius: 4px;
+    margin-left: 0.5rem;
+    font-size: 0.8rem;
+}
+
+.disclaimer .star-btn:hover {
+    background: var(--accent-light);
+    text-decoration: none;
+}
+
 /* 游戏容器 */
 .game-container {
     max-width: 800px;
