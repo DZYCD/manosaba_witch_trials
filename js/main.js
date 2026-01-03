@@ -78,6 +78,8 @@
 
         const victim = Characters.get(caseData.victim);
         UI.addSystemMessage(`各位魔法少女，${victim.name}已经离开了我们。现在，让我们开始魔女裁决，找出真凶。`);
+        // 第一阶段提示
+        UI.addSystemMessage(`💭 汉娜和雪莉走得最近，说不定能从雪莉那获得什么...?`);
 
         // 输入框始终显示
         UI.showPlayerInput(true);
@@ -131,6 +133,12 @@
             if (decision.phaseChange) {
                 if (Game.advanceCluePhase(decision.phaseChange)) {
                     UI.addSystemMessage(`💡 讨论前进了！新的线索浮出水面...`);
+                    // 根据阶段显示不同提示
+                    if (decision.phaseChange === 2) {
+                        UI.addSystemMessage(`💭 查看一下蕾雅的尸体，说不定会发现异常..?`);
+                    } else if (decision.phaseChange === 3) {
+                        UI.addSystemMessage(`💭 看来药水才是杀害的元凶。那么是谁用的这个药水呢？又是怎么做到的呢？`);
+                    }
                     UI.updateGameInfo(Game.state.round, Game.state.maxRounds, 'discussion', Game.state.cluePhase);
                 }
             }
@@ -169,7 +177,7 @@
                 const finalChar = Characters.get(speakerId);
                 if (finalChar && !finalChar.isPlayer) {
                     UI.showLoading(true);
-                    const response = await Game.characterSpeak(speakerId);
+                    const response = await Game.characterSpeak(speakerId, decision.topic);
                     UI.showLoading(false);
 
                     Game.addMessage(speakerId, response);

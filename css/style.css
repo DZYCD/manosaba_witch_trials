@@ -314,8 +314,15 @@ body {
 
 .input-hint {
     color: var(--accent);
-    margin-bottom: 0.5rem;
+    margin-bottom: 0.25rem;
     font-weight: bold;
+}
+
+.input-warning {
+    color: var(--text-muted);
+    font-size: 0.85rem;
+    margin-bottom: 0.5rem;
+    opacity: 0.8;
 }
 
 .input-hint.urgent {

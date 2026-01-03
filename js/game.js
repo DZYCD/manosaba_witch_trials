@@ -14,7 +14,12 @@ const Game = {
             cluePhase: 1,  // 线索阶段：1, 2, 3
             history: [],
             votes: {},
-            waitingForPlayer: false
+            waitingForPlayer: false,
+            completedPlotPoints: {  // 记录每个阶段已完成的剧情点
+                1: [],  // 第一阶段已完成的点
+                2: [],  // 第二阶段已完成的点
+                3: []   // 第三阶段已完成的点
+            }
         };
     },
 
@@ -24,58 +29,6 @@ const Game = {
         if (phase === 1) return this.currentCase.cluesPhase1;
         if (phase === 2) return this.currentCase.cluesPhase2;
         return this.currentCase.cluesPhase3;
-    },
-
-    // 获取剧情判官系统提示词（知道全部真相，负责判断阶段转换）
-    getStoryJudgePrompt() {
-        const fullTruth = this.currentCase.fullTruth || '';
-        const currentPhase = this.state.cluePhase;
-
-        return `你是"魔女裁决"的剧情判官，负责判断讨论是否应该进入下一阶段。
-
-【你掌握的案件全貌】
-${fullTruth}
-
-【当前线索阶段】第${currentPhase}阶段
-
-【完整推理流程】
-第一阶段：怀疑希罗
-- 大家都提到下午希罗和蕾雅吵架
-- 希罗提供不在场证明（和艾玛在淋浴室）
-- 询问其他人的不在场证明
-- 汉娜给不出来，雪莉爆出汉娜说当时要去找蕾雅
-→ 进入第二阶段
-
-第二阶段：怀疑汉娜
-- 奈叶香：有血蝴蝶，头顶有血洞，蕾雅脸上有裂痕
-- 梅露露：奈叶香找她治疗蕾雅但救不回来，脸上的痕迹是魔女化的痕迹
-- 亚里沙：魔女应该摔不死，只有"杀死魔女的药水"才能杀死魔女
-- 众人询问可可药在哪
-→ 进入第三阶段
-
-第三阶段：真相揭露
-- 可可不承认
-- 安安说可可的药丢在画室了
-- 开始怀疑在画室画画的诺亚
-- 画室正好能看到钟楼（满足目击和杀人方式）
-- 药水被丢在画室（满足杀人可能性）
-- 玛格说垃圾滑槽相连（满足杀人的隐蔽性）
-- 诺亚破防，说蕾雅魔女化了，她只是为了保护汉娜
-
-【阶段转换条件】
-
-第1阶段→第2阶段：
-只要对话中有人提到"汉娜去了钟楼"就立即转阶段！
-- 不管是谁说的都算
-
-第2阶段→第3阶段：
-只要亚里沙（arisa）说出"只有药水能杀死魔女"或类似内容，就转阶段！
-
-【输出格式】
-只输出以下之一：
-【保持当前阶段】
-【进入第二阶段】
-【进入第三阶段】`;
     },
 
     // 检测是否有两人争论僵局（某人连续发言超过2轮）
@@ -118,7 +71,7 @@ ${fullTruth}
         return breakerMap[stalemateSpeaker] || null;
     },
 
-    // 获取主持人系统提示词（不知道真相，只负责选人发言）
+    // 获取故事讲述人系统提示词（负责推进剧情发展）
     getHostPrompt() {
         const charList = Characters.getAll()
             .filter(c => c.id !== this.currentCase.victim)
@@ -145,9 +98,9 @@ ${fullTruth}
             const stalemateChar = Characters.get(stalemateSpeaker);
             const breakerChar = breaker ? Characters.get(breaker) : null;
             if (breakerChar) {
-                stalemateHint = `\n【打破僵局】${stalemateChar?.name || stalemateSpeaker}发言太多了，讨论陷入僵局！
-你必须让 ${breakerChar.name}（${breaker}）发言来推进讨论！`;
-                console.log(`[主持人] 检测到僵局：${stalemateChar?.name} 发言过多，建议让 ${breakerChar.name} 发言`);
+                stalemateHint = `\n【打破僵局】${stalemateChar?.name || stalemateSpeaker}发言太多了，故事陷入僵局！
+你必须让 ${breakerChar.name}（${breaker}）发言来推进故事！`;
+                console.log(`[故事讲述人] 检测到僵局：${stalemateChar?.name} 发言过多，建议让 ${breakerChar.name} 发言`);
             }
         }
 
@@ -180,7 +133,7 @@ ${fullTruth}
         const playerMessages = this.state.history.filter(h => h.speaker === 'emma');
         const lastPlayerMessage = playerMessages.length > 0 ? playerMessages[playerMessages.length - 1].content : null;
         const playerFocusHint = (!isEmmaLastSpeaker && lastPlayerMessage)
-            ? `\n【玩家关注点】樱羽艾玛之前说过："${lastPlayerMessage}"\n可以参考玩家的思路。` 
+            ? `\n【玩家关注点】樱羽艾玛之前说过："${lastPlayerMessage}"\n可以不忙管剧情，先参考玩家的思路。` 
             : '';
 
         // 第一轮不能选希罗
@@ -188,48 +141,43 @@ ${fullTruth}
             ? '\n【特别注意】这是第一轮发言，不能选择hiro（二阶堂希罗）作为第一个发言者！'
             : '';
 
-        return `你是"魔女裁决"的主持人，负责决定下一位发言者。
+        return `你是"魔女裁决"的故事讲述人，负责推进这个推理故事的发展。
 
 【你的职责】
-1. 根据对话内容选择合适的下一位发言者
-2. 尊重玩家（樱羽艾玛）的推理方向
-3. 玩家问什么，就让知道相关信息的角色回答
-4. 你要引导游戏进度朝着结局方向过去
+1. 你是这个故事的讲述者，你应该参考用户给的剧本，确定当前剧情到达了哪一点，你又要运行哪一个剧情
+2. 尊重玩家（樱羽艾玛）的推理方向，她是故事的主角
+3. 引导故事朝着真相的方向发展，让关键线索逐步浮出水面
 
-【参与者】
+【登场角色】
 ${charList}
-${cluesSummary}
 ${stalemateHint}
 ${emmaDirectionHint}
 
-【发言规则】
+【讲述规则】
 - 绝对不能让同一个角色连续发言两轮！
 - 如果有【打破僵局】提示，必须优先让指定角色发言！
 - 如果玩家（艾玛）刚发言，必须优先响应她的要求
 - 如果玩家提问了某人，让那个人回答
 - 如果玩家质疑某人，让那个人辩护
-- 如果没有明确方向或者丝毫没有进度，典狱长要选择可以推进进度的人来发言。
+- 如果故事没有进展，选择能推进剧情的角色，让他们说出关键信息
 ${lastSpeakerHint}
 ${playerFocusHint}
 ${firstRoundHint}
 
 【进入投票的条件】
-- 已达到25轮讨论
+- 已达到35轮讨论
 - 玩家明确表示要投票
 
 
-
-
 【输出格式】
-简短总结（1句话），然后：
+先分析目前的剧情，确定当前剧情到达了哪一个点，然后输出：
 【下一位】角色ID
+【话题】你希望这个角色谈论的内容（一句话）
 
 或者：
 【进入投票】
 
-示例：
-"梅露露说了魔女化的事。为了游戏进度，我应该让亚里莎说魔女只会被药水杀死这件事"
-【下一位】arisa`;
+`;
     },
 
     // 获取角色系统提示词
@@ -261,9 +209,8 @@ ${task}
 2. 不要主动透露所有线索！只有被直接问到时才说
 3. 可以说一些无关紧要的话，或者表达自己的情绪
 4. 如果你是嫌疑人，要为自己辩护
-5. 如果你有秘密（比如可可丢了药水），要尽量隐瞒，除非被逼问
-6. 回复控制在30-80字，像真人聊天一样
-7. 可以质疑别人，把嫌疑引向其他人`;
+5. 回复控制在30-80字，像真人聊天一样
+6. 可以质疑别人，把嫌疑引向其他人`;
     },
 
     // 获取投票系统提示词
@@ -306,113 +253,222 @@ ${votableChars}
             .join('\n');
     },
 
-    // 剧情判官决策（判断是否切换阶段）
-    async storyJudgeDecide() {
-        const systemPrompt = this.getStoryJudgePrompt();
-        const prompt = `【当前轮次】${this.state.round}/${this.state.maxRounds}
-【当前线索阶段】第${this.state.cluePhase}阶段
-
-【对话记录】
-${this.formatHistory() || '（讨论刚开始）'}
-
-请判断是否应该进入下一阶段。`;
-
-        console.log('[剧情判官] 系统提示词:', systemPrompt);
-        console.log('[剧情判官] 用户提示词:', prompt);
-
-        const response = await API.chat(systemPrompt, prompt);
-        return this.parseStoryJudgeResponse(response);
-    },
-
-    // 解析剧情判官回复
-    parseStoryJudgeResponse(text) {
-        console.log('[剧情判官] 原始回复:', text);
+    // 获取剧情进度判官系统提示词（负责判断进度和阶段转换）
+    getProgressJudgePrompt() {
+        const currentPhase = this.state.cluePhase;
+        const completedPoints = this.state.completedPlotPoints[currentPhase] || [];
         
-        if (text.includes('【进入第二阶段】')) {
-            // 检查：只要有人说过汉娜去钟楼的事就行
-            const allMessages = this.state.history;
-            const someoneSaidIt = allMessages.some(m => 
-                (m.content.includes('汉娜') && (m.content.includes('钟楼') || m.content.includes('上楼') || m.content.includes('找蕾雅')))
-            );
-            if (!someoneSaidIt) {
-                console.log('[剧情判官] 阶段转换被阻止：还没有人说出汉娜去钟楼的事');
-                return null;
-            }
-            console.log('[剧情判官] ✓ 条件满足，进入第二阶段');
-            return 2;
-        } else if (text.includes('【进入第三阶段】')) {
-            // 检查：确保亚里沙说过药水的事
-            const arisaMessages = this.state.history.filter(h => h.speaker === 'arisa');
-            const arisaSaidIt = arisaMessages.some(m => 
-                m.content.includes('药水') || (m.content.includes('药') && m.content.includes('杀'))
-            );
-            if (!arisaSaidIt) {
-                console.log('[剧情判官] 阶段转换被阻止：亚里沙还没说出药水的事');
-                return null;
-            }
-            console.log('[剧情判官] ✓ 条件满足，进入第三阶段');
-            return 3;
+        // 定义每个阶段的所有剧情点
+        let allPlotPoints = [];
+        
+        if (currentPhase === 1) {
+            allPlotPoints = [
+                { id: 1, speaker: 'millia', content: '米莉亚 说"希罗和蕾雅吵架"' },
+                { id: 2, speaker: 'hiro', content: '希罗 说"不在场证明"或"和艾玛在淋浴室"' },
+                { id: 3, speaker: 'emma', content: '艾玛 为希罗辩护（玩家发言）' },
+                { id: 4, speaker: 'marg', content: '玛格 询问亚里莎的"不在场证明"' },
+                { id: 5, speaker: 'arisa', content: '亚里莎 说"在外面"或"不在场"' },
+                { id: 6, speaker: 'sherii', content: '雪莉 说"汉娜去找蕾雅"或"汉娜去钟楼" ← 【阶段转换点】' }
+            ];
+        } else if (currentPhase === 2) {
+            allPlotPoints = [
+                { id: 1, speaker: 'marg', content: '玛格 说"汉娜是凶手"或"只有汉娜上了钟楼"' },
+                { id: 2, speaker: 'nayeka', content: '奈叶香 说"血蝴蝶"或"头顶有血洞"或"脸上有裂痕"' },
+                { id: 3, speaker: 'meruru', content: '梅露露 说"魔女化"或"救不回来"' },
+                { id: 4, speaker: 'arisa', content: '亚里沙 说"药水"和"杀死魔女" ← 【阶段转换点】' }
+            ];
+        } else {
+            allPlotPoints = [
+                { id: 1, speaker: 'coco', content: '可可 否认"丢药"或"不承认"' },
+                { id: 2, speaker: 'anan', content: '安安 说"药丢在画室"' },
+                { id: 3, speaker: 'marg', content: '玛格 怀疑"诺亚"' },
+                { id: 4, speaker: 'hiro', content: '希罗 说"画室能看到钟楼"' },
+                { id: 5, speaker: 'anan', content: '安安 说"药水在画室"' },
+                { id: 6, speaker: 'marg', content: '玛格 说"垃圾滑槽"或"相连"' },
+                { id: 7, speaker: 'noah', content: '诺亚 说"魔女化"或"保护汉娜"或承认' }
+            ];
+        }
+
+        // 过滤掉已完成的剧情点，只显示未完成的
+        const remainingPoints = allPlotPoints.filter(p => !completedPoints.includes(p.id));
+        
+        // 构建剧情点文本
+        let plotPointsText = '';
+        if (completedPoints.length > 0) {
+            plotPointsText += `【已确认完成的剧情点】${completedPoints.join(', ')}\n\n`;
         }
         
-        console.log('[剧情判官] 保持当前阶段');
-        return null;
+        if (remainingPoints.length > 0) {
+            plotPointsText += `【待完成的剧情点】（必须是指定角色说出相关内容才算完成）：\n`;
+            for (const point of remainingPoints) {
+                plotPointsText += `${point.id}. [${point.speaker}] ${point.content}\n`;
+            }
+        } else {
+            plotPointsText += `【所有剧情点已完成】\n`;
+        }
+
+        return `你是"魔女裁决"的剧情进度判官，负责判断当前剧情执行到了哪一步。
+
+【重要规则】
+剧情点完成的判定标准：必须是【指定的角色】说出了【相关的内容】才算完成！
+- 例如：要求"米莉亚说希罗和蕾雅吵架"，如果是希罗自己说的，不算完成
+- 例如：要求"艾玛为希罗辩护"，如果是希罗说艾玛可以作证，不算完成
+- 必须严格检查【发言人】是否匹配！
+
+【当前阶段】第${currentPhase}阶段
+
+${plotPointsText}
+
+【你的任务】
+1. 只检查【待完成的剧情点】，判断是否有新完成的
+2. 告诉我下一个应该发生的剧情点（从待完成列表中选择编号最小的）
+
+【输出格式】
+【新完成】编号（如果有新完成的剧情点，写编号；如果没有就写"无"）
+【下一步】编号. 具体内容
+【发言人】角色ID`;
     },
 
-    // 主持人决策（选择下一位发言者）
+    // 剧情进度判官决策（同时负责进度判断和阶段转换）
+    async progressJudgeDecide() {
+        const systemPrompt = this.getProgressJudgePrompt();
+        const prompt = `【对话记录】
+${this.formatHistory() || '（讨论刚开始）'}
+
+请分析当前剧情进度，告诉我下一步应该发生什么，以及是否需要进入下一阶段。`;
+
+        console.log('[剧情进度判官] 系统提示词:', systemPrompt);
+        console.log('[剧情进度判官] 用户提示词:', prompt);
+
+        const response = await API.chat(systemPrompt, prompt);
+        return this.parseProgressJudgeResponse(response);
+    },
+
+    // 解析剧情进度判官回复
+    parseProgressJudgeResponse(text) {
+        console.log('[剧情进度判官] 原始回复:', text);
+        
+        const result = {
+            completed: [],
+            nextStep: null,
+            nextSpeaker: null,
+            phaseChange: null
+        };
+
+        const currentPhase = this.state.cluePhase;
+
+        // 解析新完成的剧情点（只添加，不删除已完成的）
+        const newCompletedMatch = text.match(/【新完成】(.+?)(?=【|$)/s);
+        if (newCompletedMatch) {
+            const newCompletedStr = newCompletedMatch[1].trim();
+            if (newCompletedStr !== '无' && newCompletedStr !== '') {
+                // 提取数字
+                const numbers = newCompletedStr.match(/\d+/g);
+                if (numbers) {
+                    for (const num of numbers) {
+                        const pointId = parseInt(num);
+                        // 只添加不存在的点（去重）
+                        if (!this.state.completedPlotPoints[currentPhase].includes(pointId)) {
+                            this.state.completedPlotPoints[currentPhase].push(pointId);
+                            console.log(`[剧情进度判官] ✓ 新完成剧情点：阶段${currentPhase} 第${pointId}点`);
+                        }
+                    }
+                    // 排序，保持顺序
+                    this.state.completedPlotPoints[currentPhase].sort((a, b) => a - b);
+                }
+            }
+        }
+
+        // 当前阶段已完成的所有点（已完成的永远保持完成状态）
+        result.completed = [...this.state.completedPlotPoints[currentPhase]];
+
+        // 解析下一步
+        const nextStepMatch = text.match(/【下一步】(.+?)(?=【|$)/s);
+        if (nextStepMatch) {
+            result.nextStep = nextStepMatch[1].trim();
+        }
+
+        // 解析发言人
+        const speakerMatch = text.match(/【发言人】(\w+)/);
+        if (speakerMatch) {
+            result.nextSpeaker = speakerMatch[1];
+        }
+
+        // 自动判断阶段转换（不依赖剧情判官输出）
+        // 检查当前阶段是否所有剧情点都完成了
+        const phaseMaxPoints = { 1: 6, 2: 4, 3: 7 };  // 每个阶段的剧情点数量
+        const completedCount = this.state.completedPlotPoints[currentPhase].length;
+        const maxPoints = phaseMaxPoints[currentPhase];
+        
+        if (completedCount >= maxPoints && currentPhase < 3) {
+            // 当前阶段所有剧情点都完成了，自动切换到下一阶段
+            result.phaseChange = currentPhase + 1;
+            console.log(`[剧情进度判官] ✓ 阶段${currentPhase}所有${maxPoints}个剧情点已完成，自动进入第${currentPhase + 1}阶段`);
+        }
+
+        console.log('[剧情进度判官] 解析结果:', result);
+        console.log('[剧情进度判官] 当前阶段已完成的剧情点:', this.state.completedPlotPoints);
+        return result;
+    },
+
+    // 故事讲述人决策（选择下一位发言者）
     async hostDecide() {
+        // 让剧情进度判官判断当前进度和阶段转换
+        const progressInfo = await this.progressJudgeDecide();
+        
         const systemPrompt = this.getHostPrompt();
+        const currentPhase = this.state.cluePhase;
+        
+        // 构建剧情指引 - 只告诉故事讲述人下一步应该做什么
+        let plotGuide = '';
+        if (progressInfo.nextStep) {
+            plotGuide = `
+【下一步剧情】
+${progressInfo.nextStep}
+建议发言人：${progressInfo.nextSpeaker || '待定'}`;
+        } else {
+            plotGuide = `【当前阶段】第${currentPhase}阶段
+剧情进度判官未能确定下一步，请根据对话内容自行判断。`;
+        }
+
         const prompt = `【案件信息】
 受害者：${Characters.get(this.currentCase.victim).name}
 地点：${this.currentCase.location}
 时间：${this.currentCase.time}
 
 【当前轮次】${this.state.round}/${this.state.maxRounds}
+【当前阶段】第${currentPhase}阶段
 
 【对话记录】
 ${this.formatHistory() || '（讨论刚开始）'}
 
-推理应该顺畅进行。整个流程是这样，请你根据流程，以艾玛优先和推动剧情发展为准则决定当前发言人。
+${plotGuide}
 
-【完整推理流程】
-第一阶段：怀疑希罗
-- 大家都提到下午希罗和蕾雅吵架
-- 希罗提供不在场证明（和艾玛在淋浴室）
-- 玛格询问其他人的不在场证明
-- 亚里莎说自己在外面
-- 雪莉爆出汉娜说当时要去找蕾雅
-→ 进入第二阶段
+请根据上面的剧情指引，决定下一位发言者和话题。
+如果玩家（艾玛）刚发言，优先响应她的要求。
 
-第二阶段：怀疑汉娜
-- 奈叶香说有血蝴蝶，头顶有血洞，蕾雅脸上有裂痕
-- 梅露露说奈叶香找她治疗蕾雅但救不回来，脸上的痕迹是魔女化的痕迹
-- 亚里沙立即说魔女应该摔不死，只有"杀死魔女的药水"才能杀死魔女
-→ 进入第三阶段
+否则，按照【下一步剧情】的指引明确要求${progressInfo.nextStep}。`;
 
-第三阶段：真相揭露
-- 可可不承认自己丢了药
-- 安安说可可的药丢在画室了
-- 开始怀疑在画室画画的诺亚
-- 希罗说画室正好能看到钟楼(满足目击和杀人方式）
-- 药水被丢在画室（满足杀人可能性）
-- 玛格说垃圾滑槽相连（满足杀人的隐蔽性）
-- 诺亚破防，说蕾雅魔女化了，她只是为了保护汉娜 
-
-请决定下一位发言者。`;
-
-        console.log('[主持人] 系统提示词:', systemPrompt);
-        console.log('[主持人] 用户提示词:', prompt);
+        console.log('[故事讲述人] 系统提示词:', systemPrompt);
+        console.log('[故事讲述人] 用户提示词:', prompt);
 
         const response = await API.chat(systemPrompt, prompt);
-        return this.parseHostResponse(response);
+        
+        // 把阶段转换信息附加到结果中
+        const hostResult = this.parseHostResponse(response);
+        hostResult.phaseChange = progressInfo.phaseChange;
+        
+        return hostResult;
     },
 
-    // 解析主持人回复
+    // 解析故事讲述人回复
     parseHostResponse(text) {
-        console.log('[主持人] 原始回复:', text);
+        console.log('[故事讲述人] 原始回复:', text);
         
         const result = {
             summary: text.replace(/【[^】]+】.*/g, '').trim(),
             nextSpeaker: null,
+            topic: null,
             startVoting: false
         };
 
@@ -425,8 +481,14 @@ ${this.formatHistory() || '（讨论刚开始）'}
         if (match) {
             result.nextSpeaker = match[1];
         }
+
+        // 尝试匹配【话题】格式
+        const topicMatch = text.match(/【话题】(.+?)(?=【|$)/s);
+        if (topicMatch) {
+            result.topic = topicMatch[1].trim();
+        }
         
-        // 如果没有匹配到，尝试从文本中提取角色名
+        // 如果没有匹配到角色，尝试从文本中提取角色名
         if (!result.nextSpeaker) {
             const allChars = Characters.getAll().filter(c => c.id !== this.currentCase?.victim);
             
@@ -434,7 +496,7 @@ ${this.formatHistory() || '（讨论刚开始）'}
             for (const char of allChars) {
                 if (text.toLowerCase().includes(char.id)) {
                     result.nextSpeaker = char.id;
-                    console.log('[主持人] 从文本中提取到角色ID:', char.id);
+                    console.log('[故事讲述人] 从文本中提取到角色ID:', char.id);
                     break;
                 }
             }
@@ -444,30 +506,28 @@ ${this.formatHistory() || '（讨论刚开始）'}
                 for (const char of allChars) {
                     if (text.includes(char.name)) {
                         result.nextSpeaker = char.id;
-                        console.log('[主持人] 从文本中提取到角色名:', char.name, '-> ID:', char.id);
+                        console.log('[故事讲述人] 从文本中提取到角色名:', char.name, '-> ID:', char.id);
                         break;
                     }
                 }
             }
         }
 
-        console.log('[主持人] 解析结果:', result);
+        console.log('[故事讲述人] 解析结果:', result);
         return result;
     },
 
-    // 典狱长决策（组合两个判断）
+    // 典狱长决策（现在只调用故事讲述人，阶段转换由剧情进度判官一并处理）
     async wardenDecide() {
-        // 先让剧情判官判断是否切换阶段
-        const phaseChange = await this.storyJudgeDecide();
-        
-        // 再让主持人选择下一位发言者
+        // 故事讲述人决策（内部会调用剧情进度判官）
         const hostDecision = await this.hostDecide();
         
         return {
             summary: hostDecision.summary,
             nextSpeaker: hostDecision.nextSpeaker,
+            topic: hostDecision.topic,
             startVoting: hostDecision.startVoting,
-            phaseChange: phaseChange
+            phaseChange: hostDecision.phaseChange
         };
     },
 
@@ -504,7 +564,7 @@ ${this.formatHistory() || '（讨论刚开始）'}
         if (newPhase > this.state.cluePhase && newPhase <= 3) {
             this.state.cluePhase = newPhase;
             // 进入下一阶段，轮次上限+15
-            this.state.maxRounds += 15;
+            this.state.maxRounds += 5;
             console.log(`[阶段转换] 进入第${newPhase}阶段，轮次上限增加到 ${this.state.maxRounds}`);
             return true;
         }
@@ -512,13 +572,18 @@ ${this.formatHistory() || '（讨论刚开始）'}
     },
 
     // 角色发言
-    async characterSpeak(charId) {
+    async characterSpeak(charId, topic = null) {
         const char = Characters.get(charId);
         const systemPrompt = this.getCharacterSystemPrompt(charId);
         
         // 误导性线索 - 只给AI看
         const misleadingInfo = this.currentCase.misleadingInfo 
             ? `\n【背景信息】${this.currentCase.misleadingInfo}` 
+            : '';
+
+        // 话题提示
+        const topicHint = topic 
+            ? `\n\n【典狱长提示】现在轮到你发言：${topic}。` 
             : '';
 
         const prompt = `【案件背景】
@@ -530,7 +595,7 @@ ${this.currentCase.publicInfo}${misleadingInfo}
 【对话记录】
 ${this.formatHistory()}
 
-现在轮到你发言了。`;
+现在轮到你发言了。${topicHint}`;
 
         console.log(`[角色:${char?.name || charId}] 系统提示词:`, systemPrompt);
         console.log(`[角色:${char?.name || charId}] 用户提示词:`, prompt);
@@ -604,7 +669,7 @@ ${this.formatHistory()}
     // 统计投票结果
     countVotes() {
         const counts = {};
-        for (const [voter, data] of Object.entries(this.state.votes)) {
+        for (const [, data] of Object.entries(this.state.votes)) {
             const target = data.target;
             counts[target] = (counts[target] || 0) + 1;
         }
