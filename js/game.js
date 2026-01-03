@@ -272,7 +272,7 @@ ${votableChars}
             ];
         } else if (currentPhase === 2) {
             allPlotPoints = [
-                { id: 1, speaker: 'marg', content: '玛格 说"汉娜是凶手"或"只有汉娜上了钟楼"' },
+                { id: 1, speaker: 'marg', content: '玛格 说"汉娜有作案动机"' },
                 { id: 2, speaker: 'nayeka', content: '奈叶香 说"血蝴蝶"或"头顶有血洞"或"脸上有裂痕"' },
                 { id: 3, speaker: 'meruru', content: '梅露露 说"魔女化"或"救不回来"' },
                 { id: 4, speaker: 'arisa', content: '亚里沙 说"药水"和"杀死魔女" ← 【阶段转换点】' }
@@ -281,51 +281,50 @@ ${votableChars}
             allPlotPoints = [
                 { id: 1, speaker: 'coco', content: '可可 否认"丢药"或"不承认"' },
                 { id: 2, speaker: 'anan', content: '安安 说"药丢在画室"' },
-                { id: 3, speaker: 'marg', content: '玛格 怀疑"诺亚"' },
+                { id: 3, speaker: 'marg', content: '玛格 询问诺亚当时在做什么' },
                 { id: 4, speaker: 'hiro', content: '希罗 说"画室能看到钟楼"' },
-                { id: 5, speaker: 'anan', content: '安安 说"药水在画室"' },
-                { id: 6, speaker: 'marg', content: '玛格 说"垃圾滑槽"或"相连"' },
-                { id: 7, speaker: 'noah', content: '诺亚 说"魔女化"或"保护汉娜"或承认' }
+                { id: 5, speaker: 'marg', content: '玛格 说"垃圾滑槽"或"相连"' },
+                { id: 6, speaker: 'noah', content: '诺亚 说"魔女化"或"保护汉娜"或承认' }
             ];
         }
 
-        // 过滤掉已完成的剧情点，只显示未完成的
-        const remainingPoints = allPlotPoints.filter(p => !completedPoints.includes(p.id));
-        
-        // 构建剧情点文本
-        let plotPointsText = '';
-        if (completedPoints.length > 0) {
-            plotPointsText += `【已确认完成的剧情点】${completedPoints.join(', ')}\n\n`;
-        }
-        
-        if (remainingPoints.length > 0) {
-            plotPointsText += `【待完成的剧情点】（必须是指定角色说出相关内容才算完成）：\n`;
-            for (const point of remainingPoints) {
-                plotPointsText += `${point.id}. [${point.speaker}] ${point.content}\n`;
-            }
-        } else {
-            plotPointsText += `【所有剧情点已完成】\n`;
+        // 构建剧情点列表文本（全部显示，标记已完成的）
+        let plotPointsText = '【剧情点列表】\n';
+        for (const point of allPlotPoints) {
+            const isCompleted = completedPoints.includes(point.id);
+            const status = isCompleted ? '✓已完成' : '○待完成';
+            plotPointsText += `${point.id}. [${status}] [${point.speaker}] ${point.content}\n`;
         }
 
-        return `你是"魔女裁决"的剧情进度判官，负责判断当前剧情执行到了哪一步。
+        // 找到第一个未完成的点
+        const firstIncomplete = allPlotPoints.find(p => !completedPoints.includes(p.id));
+        const checkTarget = firstIncomplete 
+            ? `请重点检查第${firstIncomplete.id}条是否已完成。` 
+            : '所有剧情点已完成。';
 
-【重要规则】
-剧情点完成的判定标准：必须是【指定的角色】说出了【相关的内容】才算完成！
+        return `你是"魔女裁决"的剧情进度判官，负责按顺序检查剧情点是否完成。
+
+【判定规则】
+- 必须是【指定的角色】说出了【相关的内容】才算完成
+- 内容匹配要灵活，意思相近即可，不要太死板
 - 例如：要求"米莉亚说希罗和蕾雅吵架"，如果是希罗自己说的，不算完成
-- 例如：要求"艾玛为希罗辩护"，如果是希罗说艾玛可以作证，不算完成
-- 必须严格检查【发言人】是否匹配！
 
 【当前阶段】第${currentPhase}阶段
 
 ${plotPointsText}
 
 【你的任务】
-1. 只检查【待完成的剧情点】，判断是否有新完成的
-2. 告诉我下一个应该发生的剧情点（从待完成列表中选择编号最小的）
+按顺序检查剧情点：
+1. 从第一个"○待完成"的点开始检查
+2. 如果对话中已经有对应角色说了相关内容 → 标记为完成，继续检查下一个
+3. 如果对话中没有 → 这就是【下一步】要推进的剧情点，停止检查
+
+${checkTarget}
 
 【输出格式】
-【新完成】编号（如果有新完成的剧情点，写编号；如果没有就写"无"）
-【下一步】编号. 具体内容
+【分析】逐条分析待完成的剧情点（从编号最小的开始），说明是否在对话中找到了对应内容
+【新完成】编号（多个用逗号分隔，没有就写"无"）
+【下一步】编号. 具体内容（第一个未完成的剧情点）
 【发言人】角色ID`;
     },
 
@@ -583,7 +582,7 @@ ${plotGuide}
 
         // 话题提示
         const topicHint = topic 
-            ? `\n\n【典狱长提示】现在轮到你发言：${topic}。` 
+            ? `\n\n现在轮到你发言。你发言中必须要“明确”带有这个关键词：${topic}。` 
             : '';
 
         const prompt = `【案件背景】
