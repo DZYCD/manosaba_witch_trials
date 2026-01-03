@@ -226,6 +226,8 @@ ${this.formatHistory() || '（讨论刚开始）'}
 
     // 解析剧情判官回复
     parseStoryJudgeResponse(text) {
+        console.log('[剧情判官] 原始回复:', text);
+        
         if (text.includes('【进入第二阶段】')) {
             // 检查：只要有人说过汉娜去钟楼的事就行
             const allMessages = this.state.history;
@@ -233,9 +235,10 @@ ${this.formatHistory() || '（讨论刚开始）'}
                 (m.content.includes('汉娜') && (m.content.includes('钟楼') || m.content.includes('上楼') || m.content.includes('找蕾雅')))
             );
             if (!someoneSaidIt) {
-                console.warn('阶段转换被阻止：还没有人说出汉娜去钟楼的事');
+                console.log('[剧情判官] 阶段转换被阻止：还没有人说出汉娜去钟楼的事');
                 return null;
             }
+            console.log('[剧情判官] ✓ 条件满足，进入第二阶段');
             return 2;
         } else if (text.includes('【进入第三阶段】')) {
             // 检查：确保亚里沙说过药水的事
@@ -244,11 +247,14 @@ ${this.formatHistory() || '（讨论刚开始）'}
                 m.content.includes('药水') || (m.content.includes('药') && m.content.includes('杀'))
             );
             if (!arisaSaidIt) {
-                console.warn('阶段转换被阻止：亚里沙还没说出药水的事');
+                console.log('[剧情判官] 阶段转换被阻止：亚里沙还没说出药水的事');
                 return null;
             }
+            console.log('[剧情判官] ✓ 条件满足，进入第三阶段');
             return 3;
         }
+        
+        console.log('[剧情判官] 保持当前阶段');
         return null;
     },
 
