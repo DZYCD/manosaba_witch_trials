@@ -30,22 +30,41 @@
     <!-- 主游戏界面 -->
     <div id="game-container" class="game-container hidden">
         <!-- 免责声明 -->
-        <div class="disclaimer">
-            <p>📜 本游戏为《魔法少女的魔女审判》的二创同人游戏，不用于任何商业用途。</p>
-            <p>🤖 本游戏的角色讨论全部使用AI生成，提示词过长可能导致OOC现象。</p>
-            <p>📚 十三位魔法少女的角色提示词来源于萌娘百科整理总结。</p>
-            <p>🎲 游戏内案件在最开始通过AI生成，每局随机选择。</p>
-            <p>👤 作者：bilibili@单子叶蚕豆</p>
-            <p class="github-link">
-                ⭐ 喜欢这个项目？
-                <a href="https://github.com/DZYCD/manosaba_witch_trials" target="_blank">GitHub</a> 
-                点个 Star 支持一下！
-                <a href="https://github.com/DZYCD/manosaba_witch_trials/stargazers" target="_blank" class="star-btn">🌟 Star</a>
-            </p>
-            <p class="home-link">
-                🏠 <a href="http://47.100.11.98" target="_blank">访问作者主页</a>
-            </p>
+        <div class="disclaimer" id="disclaimer">
+            <div class="disclaimer-header" onclick="toggleDisclaimer()">
+                <span>📜 游戏说明</span>
+                <span class="disclaimer-toggle" id="disclaimer-toggle">▼</span>
+            </div>
+            <div class="disclaimer-content" id="disclaimer-content">
+                <p>📜 本游戏为《魔法少女的魔女审判》的二创同人游戏，不用于任何商业用途。</p>
+                <p>🤖 本游戏的角色讨论全部使用AI生成，提示词过长可能导致OOC现象。</p>
+                <p>📚 十三位魔法少女的角色提示词来源于萌娘百科整理总结。</p>
+                <p>🎲 游戏内案件在最开始通过AI生成，每局随机选择。</p>
+                <p>👤 作者：bilibili@单子叶蚕豆</p>
+                <p class="github-link">
+                    ⭐ 喜欢这个项目？
+                    <a href="https://github.com/DZYCD/manosaba_witch_trials" target="_blank">GitHub</a> 
+                    点个 Star 支持一下！
+                    <a href="https://github.com/DZYCD/manosaba_witch_trials/stargazers" target="_blank" class="star-btn">🌟 Star</a>
+                </p>
+                <p class="home-link">
+                    🏠 <a href="http://47.100.11.98" target="_blank">访问作者主页</a>
+                </p>
+            </div>
         </div>
+        <script>
+            function toggleDisclaimer() {
+                const content = document.getElementById('disclaimer-content');
+                const toggle = document.getElementById('disclaimer-toggle');
+                if (content.classList.contains('collapsed')) {
+                    content.classList.remove('collapsed');
+                    toggle.textContent = '▼';
+                } else {
+                    content.classList.add('collapsed');
+                    toggle.textContent = '▶';
+                }
+            }
+        </script>
 
         <!-- 顶部信息栏 -->
         <header class="game-header">
