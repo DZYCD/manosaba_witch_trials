@@ -61,15 +61,15 @@ ${fullTruth}
             .map(c => `- ${c.id}（${c.name}）`)
             .join('\n');
 
-        // 获取当前阶段每个角色知道的线索摘要
+        // 获取当前阶段每个角色知道的线索
         const currentClues = this.getCurrentClues();
         let cluesSummary = '\n【各角色掌握的信息】\n';
         for (const [charId, clue] of Object.entries(currentClues)) {
             const char = Characters.get(charId);
             if (char) {
-                // 简化线索描述，去掉括号内的隐藏指示
+                // 去掉括号内的隐藏指示，保留完整内容
                 const simplifiedClue = clue.replace(/（[^）]*）/g, '').replace(/\([^)]*\)/g, '').trim();
-                cluesSummary += `- ${char.name}：${simplifiedClue.substring(0, 50)}${simplifiedClue.length > 50 ? '...' : ''}\n`;
+                cluesSummary += `- ${char.name}：${simplifiedClue}\n`;
             }
         }
 
