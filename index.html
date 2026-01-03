@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>魔女裁决 - 魔法少女的推理游戏</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+    <!-- 设置面板 -->
+    <div id="settings-panel" class="settings-panel">
+        <div class="settings-content">
+            <h2>⚙️ API 设置</h2>
+            <div class="form-group">
+                <label>OpenAI API URL</label>
+                <input type="text" id="api-url" placeholder="https://api.openai.com/v1/chat/completions">
+            </div>
+            <div class="form-group">
+                <label>API Key</label>
+                <input type="password" id="api-key" placeholder="sk-...">
+            </div>
+            <div class="form-group">
+                <label>模型</label>
+                <input type="text" id="model-name" placeholder="gpt-4o-mini">
+            </div>
+            <button id="save-settings" class="btn-primary">保存并开始</button>
+        </div>
+    </div>
+
+    <!-- 主游戏界面 -->
+    <div id="game-container" class="game-container hidden">
+        <!-- 免责声明 -->
+        <div class="disclaimer">
+            <p>📜 本游戏为《魔法少女的魔女审判》的二创同人游戏，不用于任何商业用途。</p>
+            <p>🤖 本游戏的角色讨论全部使用AI生成，提示词过长可能导致OOC现象。</p>
+            <p>📚 十三位魔法少女的角色提示词来源于萌娘百科整理总结。</p>
+            <p>🎲 游戏内案件在最开始通过AI生成，每局随机选择。</p>
+            <p>👤 作者：bilibili@单子叶蚕豆</p>
+        </div>
+
+        <!-- 顶部信息栏 -->
+        <header class="game-header">
+            <div class="game-title">🌙 魔女裁决</div>
+            <div class="game-info">
+                <span id="round-info">轮次: 0/30</span>
+                <span id="timer-info">⏰ 30:00</span>
+                <span id="phase-info">阶段: 讨论中</span>
+            </div>
+            <button id="open-settings" class="btn-icon">⚙️</button>
+        </header>
+
+        <!-- 案件信息 -->
+        <div id="case-panel" class="case-panel">
+            <h3>📋 案件信息</h3>
+            <div id="case-info"></div>
+        </div>
+
+        <!-- 聊天区域 -->
+        <div id="chat-container" class="chat-container">
+            <div id="chat-messages" class="chat-messages"></div>
+        </div>
+
+        <!-- 玩家输入区 -->
+        <div id="input-area" class="input-area hidden">
+            <div class="input-hint">随时可以插话，樱羽艾玛</div>
+            <textarea id="player-input" placeholder="输入你的发言，随时可以插话..."></textarea>
+            <button id="send-btn" class="btn-primary">发送</button>
+        </div>
+
+        <!-- 投票面板 -->
+        <div id="vote-panel" class="vote-panel hidden">
+            <h3>🗳️ 魔女投票</h3>
+            <div id="vote-progress" class="vote-progress"></div>
+            <div id="vote-options"></div>
+            <button id="submit-vote" class="btn-primary">确认投票</button>
+        </div>
+
+        <!-- 控制按钮 -->
+        <div class="game-controls">
+            <button id="start-game" class="btn-primary">开始新游戏</button>
+            <button id="next-turn" class="btn-secondary hidden">继续</button>
+        </div>
+    </div>
+
+    <script src="js/config.js"></script>
+    <script src="js/characters.js"></script>
+    <script src="js/cases.js"></script>
+    <script src="js/api.js"></script>
+    <script src="js/game.js"></script>
+    <script src="js/ui.js"></script>
+    <script src="js/main.js"></script>
+</body>
+</html>
