@@ -61,6 +61,18 @@ ${fullTruth}
             .map(c => `- ${c.id}（${c.name}）`)
             .join('\n');
 
+        // 获取当前阶段每个角色知道的线索摘要
+        const currentClues = this.getCurrentClues();
+        let cluesSummary = '\n【各角色掌握的信息】\n';
+        for (const [charId, clue] of Object.entries(currentClues)) {
+            const char = Characters.get(charId);
+            if (char) {
+                // 简化线索描述，去掉括号内的隐藏指示
+                const simplifiedClue = clue.replace(/（[^）]*）/g, '').replace(/\([^)]*\)/g, '').trim();
+                cluesSummary += `- ${char.name}：${simplifiedClue.substring(0, 50)}${simplifiedClue.length > 50 ? '...' : ''}\n`;
+            }
+        }
+
         // 获取上一位发言者
         const lastSpeaker = this.state.history.length > 0 
             ? this.state.history[this.state.history.length - 1].speaker 
@@ -81,7 +93,7 @@ ${fullTruth}
             emmaDirectionHint = `\n【最高优先级】艾玛刚刚发言了："${lastMessage.content}"
 你必须分析艾玛的发言，判断她想让谁回答：
 - 如果艾玛提到了某个角色的名字或ID，让那个角色发言
-- 如果艾玛问了某个问题，让最可能知道答案的角色回答
+- 如果艾玛问了某个问题，根据上面的【各角色掌握的信息】，让最可能知道答案的角色回答
 - 如果艾玛质疑某人，让那个人辩护
 - 艾玛的意愿是最重要的，必须尊重！`;
         }
@@ -103,11 +115,12 @@ ${fullTruth}
 【你的职责】
 1. 根据对话内容选择合适的下一位发言者
 2. 尊重玩家（樱羽艾玛）的推理方向
-3. 玩家问什么，就让相关角色回答
+3. 玩家问什么，就让知道相关信息的角色回答
 4. 保持讨论的自然流动
 
 【参与者】
 ${charList}
+${cluesSummary}
 ${emmaDirectionHint}
 
 【发言规则】
@@ -115,6 +128,7 @@ ${emmaDirectionHint}
 - 如果玩家（艾玛）刚发言，必须优先响应她的要求
 - 如果玩家提问了某人，让那个人回答
 - 如果玩家质疑某人，让那个人辩护
+- 根据【各角色掌握的信息】选择能回答问题的角色
 - 如果没有明确方向，可以随机选择
 ${lastSpeakerHint}
 ${playerFocusHint}
